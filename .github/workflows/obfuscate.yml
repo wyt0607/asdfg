@@ -1,0 +1,56 @@
+name: Code Obfuscation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '_worker.js'
+  workflow_dispatch:
+
+jobs:
+  obfuscate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install javascript-obfuscator
+
+      - name: Create obfuscation script
+        run: |
+          cat > obfuscate.js << 'EOF'
+          const JavaScriptObfuscator = require('javascript-obfuscator');
+          const fs = require('fs');
+          
+          const code = fs.readFileSync('_worker.js', 'utf8');
+          const obfuscated = JavaScriptObfuscator.obfuscate(code, {
+            compact: true,
+            stringArray: true,
+            stringArrayThreshold: 0.75,
+            renameGlobals: false,
+          }).getObfuscatedCode();
+          
+          fs.writeFileSync('_worker.js', obfuscated);
+          console.log('✅ Code obfuscated successfully!');
+          EOF
+
+      - name: Run obfuscation
+        run: node obfuscate.js
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add _worker.js
+          git commit -m "chore: obfuscate code [skip ci]" || true
+          git push
